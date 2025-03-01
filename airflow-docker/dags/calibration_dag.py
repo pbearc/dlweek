@@ -3,7 +3,8 @@ from airflow.operators.python_operator import PythonOperator
 from datetime import datetime, timedelta
 from sqlalchemy import create_engine
 import pandas as pd
-import pika
+from kafka import KafkaProducer
+import json
 
 # Default arguments for the DAG
 default_args = {
@@ -21,15 +22,22 @@ dag = DAG(
     schedule_interval='@daily',  # Adjust according to your needs
 )
 
-# Function to send alerts using RabbitMQ
 def send_alert(message):
-    connection = pika.BlockingConnection(pika.ConnectionParameters('localhost'))  # Connect to RabbitMQ server
-    channel = connection.channel()
-    channel.queue_declare(queue='calibration_alerts')  # Declare the queue for alerts
+    # Set up the Kafka producer
+    producer = KafkaProducer(
+        bootstrap_servers=['localhost:9092'],  # Replace with your Kafka server's address
+        value_serializer=lambda v: json.dumps(v).encode('utf-8')  # Serialize messages to JSON
+    )
 
-    channel.basic_publish(exchange='', routing_key='calibration_alerts', body=message)  # Send the message
+    # Send the alert message to the 'calibration_alerts' topic
+    producer.send('calibration_alerts', value=message)
+
+    # Ensure message is sent
+    producer.flush()
+
     print(f"Sent alert: {message}")
-    connection.close()
+    producer.close()
+
 
 # Function for the ETL process
 def etl_process():
@@ -117,8 +125,6 @@ etl_task = PythonOperator(
     dag=dag,
 )
 
-# Optional task for additional post-processing (if needed)
-# For instance, a task that runs after the ETL process, like generating reports or summaries
 def post_process():
     print("🔄 Post-processing tasks are running!")
 
@@ -129,5 +135,5 @@ refresh_dashboard = PythonOperator(
 )
 
 # Set the task dependencies
-etl_task >> refresh_dashboard  # Ensure that the post-processing task runs after the ETL task
+etl_task >> refresh_dashboard  
 

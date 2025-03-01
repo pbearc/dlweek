@@ -229,7 +229,7 @@ def generate_dashboard():
 # Main Streamlit App
 def main():
     st.sidebar.title("Navigation")
-    page = st.sidebar.radio("Select a Page", ["Log Calibration", "Dashboard"])
+    page = st.sidebar.radio("Select a Page", ["Log Calibration", "Add/update calibration tools", "Dashboard"])
 
     if page == "Log Calibration":
         log_calibration()
